@@ -254,6 +254,24 @@
       </div>
 
       <div class="control">
+        <label for="fitMode">Image Fit</label>
+        <select id="fitMode">
+          <option value="cover">Crop to Fill</option>
+          <option value="contain">Show Full Image / Uncropped</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="exportScale">Export Resolution</label>
+        <select id="exportScale">
+          <option value="1">Normal 1×</option>
+          <option value="2">High 2×</option>
+          <option value="3">Ultra 3×</option>
+          <option value="4">Print 4×</option>
+        </select>
+      </div>
+
+      <div class="control">
         <label for="background">Background</label>
         <input type="color" id="background" value="#ffffff" />
       </div>
@@ -280,6 +298,8 @@
     const sizeSelect = document.getElementById('size');
     const gapInput = document.getElementById('gap');
     const radiusInput = document.getElementById('radius');
+    const fitModeSelect = document.getElementById('fitMode');
+    const exportScaleSelect = document.getElementById('exportScale');
     const backgroundInput = document.getElementById('background');
     const gapValue = document.getElementById('gapValue');
     const radiusValue = document.getElementById('radiusValue');
@@ -310,7 +330,7 @@
       fileInput.value = '';
     });
 
-    [layoutSelect, sizeSelect, gapInput, radiusInput, backgroundInput].forEach(control => {
+    [layoutSelect, sizeSelect, gapInput, radiusInput, fitModeSelect, exportScaleSelect, backgroundInput].forEach(control => {
       control.addEventListener('input', renderCollage);
     });
 
@@ -385,6 +405,7 @@
         }
 
         cell.innerHTML = `<img src="${src}" alt="Collage image ${index + 1}">`;
+        cell.querySelector('img').style.objectFit = fitModeSelect.value;
         collage.appendChild(cell);
       });
     }
@@ -444,18 +465,20 @@
 
     async function drawCollageToCanvas() {
       const rect = collage.getBoundingClientRect();
+      const scale = Number(exportScaleSelect.value);
       const width = Math.round(rect.width);
       const height = Math.round(rect.height);
-      const gap = Number(gapInput.value);
-      const radius = Number(radiusInput.value);
+      const outputWidth = width * scale;
+      const outputHeight = height * scale;
+      const radius = Number(radiusInput.value) * scale;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
 
       ctx.fillStyle = backgroundInput.value;
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(0, 0, outputWidth, outputHeight);
 
       const cells = [...collage.querySelectorAll('.cell')];
       const loadedImages = await Promise.all(images.map(loadImage));
@@ -463,20 +486,44 @@
       cells.forEach((cell, index) => {
         const cellRect = cell.getBoundingClientRect();
         const collageRect = collage.getBoundingClientRect();
-        const x = cellRect.left - collageRect.left;
-        const y = cellRect.top - collageRect.top;
-        const w = cellRect.width;
-        const h = cellRect.height;
+        const x = (cellRect.left - collageRect.left) * scale;
+        const y = (cellRect.top - collageRect.top) * scale;
+        const w = cellRect.width * scale;
+        const h = cellRect.height * scale;
         const img = loadedImages[index];
 
         ctx.save();
         roundedRect(ctx, x, y, w, h, radius);
         ctx.clip();
-        drawImageCover(ctx, img, x, y, w, h);
+        if (fitModeSelect.value === 'contain') {
+          drawImageContain(ctx, img, x, y, w, h);
+        } else {
+          drawImageCover(ctx, img, x, y, w, h);
+        }
         ctx.restore();
       });
 
       return canvas;
+    }
+
+    function drawImageContain(ctx, img, x, y, w, h) {
+      const imageRatio = img.width / img.height;
+      const boxRatio = w / h;
+      let drawWidth, drawHeight, drawX, drawY;
+
+      if (imageRatio > boxRatio) {
+        drawWidth = w;
+        drawHeight = w / imageRatio;
+        drawX = x;
+        drawY = y + (h - drawHeight) / 2;
+      } else {
+        drawHeight = h;
+        drawWidth = h * imageRatio;
+        drawX = x + (w - drawWidth) / 2;
+        drawY = y;
+      }
+
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
     }
 
     function drawImageCover(ctx, img, x, y, w, h) {
