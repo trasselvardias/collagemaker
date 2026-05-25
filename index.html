@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Easy Picture Collage Tool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f7;
+      color: #222;
+    }
+
+    header {
+      padding: 24px;
+      text-align: center;
+      background: white;
+      border-bottom: 1px solid #ddd;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    header p {
+      margin: 0;
+      color: #666;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .panel,
+    .preview-wrap {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    .drop-zone {
+      border: 2px dashed #aaa;
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s;
+      background: #fafafa;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: #333;
+      background: #f0f0f0;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    label,
+    select,
+    input[type="range"],
+    button {
+      width: 100%;
+    }
+
+    .control {
+      margin-top: 18px;
+    }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    select,
+    button {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      background: white;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      font-weight: bold;
+      color: white;
+      background: #222;
+      margin-top: 12px;
+    }
+
+    button.secondary {
+      background: #777;
+    }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #eee;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb button {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      margin: 0;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.7);
+      font-size: 14px;
+      line-height: 24px;
+    }
+
+    .preview-wrap {
+      min-height: 650px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+    }
+
+    #collage {
+      width: 900px;
+      height: 600px;
+      background: white;
+      display: grid;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    .cell {
+      overflow: hidden;
+      background: #e9e9e9;
+    }
+
+    .cell img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .empty-state {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      color: #777;
+      font-size: 18px;
+      grid-column: 1 / -1;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      #collage {
+        width: 90vw;
+        height: 60vw;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Easy Picture Collage Tool</h1>
+    <p>Upload images, choose a layout, adjust spacing, then export your collage.</p>
+  </header>
+
+  <main class="app">
+    <section class="panel">
+      <h2>Collage Controls</h2>
+
+      <div class="drop-zone" id="dropZone">
+        <strong>Click or drag pictures here</strong>
+        <p>JPG, PNG, GIF, or WebP</p>
+        <input type="file" id="fileInput" accept="image/*" multiple />
+      </div>
+
+      <div class="control">
+        <label for="layout">Layout</label>
+        <select id="layout">
+          <option value="grid">Auto Grid</option>
+          <option value="two-columns">Two Columns</option>
+          <option value="three-columns">Three Columns</option>
+          <option value="masonry">Feature First Image</option>
+          <option value="banner">Wide Banner Rows</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="size">Canvas Size</label>
+        <select id="size">
+          <option value="900x600">Landscape 3:2</option>
+          <option value="800x800">Square</option>
+          <option value="600x900">Portrait 2:3</option>
+          <option value="1200x675">Widescreen 16:9</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="gap">Spacing <span id="gapValue">8px</span></label>
+        <input type="range" id="gap" min="0" max="40" value="8" />
+      </div>
+
+      <div class="control">
+        <label for="radius">Corner Roundness <span id="radiusValue">8px</span></label>
+        <input type="range" id="radius" min="0" max="40" value="8" />
+      </div>
+
+      <div class="control">
+        <label for="background">Background</label>
+        <input type="color" id="background" value="#ffffff" />
+      </div>
+
+      <button id="downloadBtn">Download Collage PNG</button>
+      <button class="secondary" id="clearBtn">Clear Images</button>
+
+      <div class="thumbs" id="thumbs"></div>
+    </section>
+
+    <section class="preview-wrap">
+      <div id="collage">
+        <div class="empty-state">Add pictures to start your collage.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const collage = document.getElementById('collage');
+    const thumbs = document.getElementById('thumbs');
+    const layoutSelect = document.getElementById('layout');
+    const sizeSelect = document.getElementById('size');
+    const gapInput = document.getElementById('gap');
+    const radiusInput = document.getElementById('radius');
+    const backgroundInput = document.getElementById('background');
+    const gapValue = document.getElementById('gapValue');
+    const radiusValue = document.getElementById('radiusValue');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    let images = [];
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', event => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', event => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+      handleFiles(event.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', event => {
+      handleFiles(event.target.files);
+      fileInput.value = '';
+    });
+
+    [layoutSelect, sizeSelect, gapInput, radiusInput, backgroundInput].forEach(control => {
+      control.addEventListener('input', renderCollage);
+    });
+
+    clearBtn.addEventListener('click', () => {
+      images = [];
+      renderCollage();
+    });
+
+    downloadBtn.addEventListener('click', downloadCollage);
+
+    function handleFiles(files) {
+      [...files].forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = event => {
+          images.push(event.target.result);
+          renderCollage();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderCollage() {
+      const [width, height] = sizeSelect.value.split('x').map(Number);
+      const gap = Number(gapInput.value);
+      const radius = Number(radiusInput.value);
+
+      gapValue.textContent = `${gap}px`;
+      radiusValue.textContent = `${radius}px`;
+
+      collage.style.width = `${width}px`;
+      collage.style.height = `${height}px`;
+      collage.style.gap = `${gap}px`;
+      collage.style.padding = `${gap}px`;
+      collage.style.background = backgroundInput.value;
+
+      thumbs.innerHTML = '';
+      images.forEach((src, index) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+        thumb.innerHTML = `
+          <img src="${src}" alt="Uploaded image ${index + 1}">
+          <button aria-label="Remove image">×</button>
+        `;
+        thumb.querySelector('button').addEventListener('click', () => {
+          images.splice(index, 1);
+          renderCollage();
+        });
+        thumbs.appendChild(thumb);
+      });
+
+      collage.innerHTML = '';
+
+      if (images.length === 0) {
+        collage.style.gridTemplateColumns = '1fr';
+        collage.style.gridTemplateRows = '1fr';
+        collage.innerHTML = '<div class="empty-state">Add pictures to start your collage.</div>';
+        return;
+      }
+
+      applyLayout(images.length);
+
+      images.forEach((src, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.borderRadius = `${radius}px`;
+
+        if (layoutSelect.value === 'masonry' && index === 0 && images.length > 2) {
+          cell.style.gridColumn = 'span 2';
+          cell.style.gridRow = 'span 2';
+        }
+
+        cell.innerHTML = `<img src="${src}" alt="Collage image ${index + 1}">`;
+        collage.appendChild(cell);
+      });
+    }
+
+    function applyLayout(count) {
+      const layout = layoutSelect.value;
+
+      if (layout === 'two-columns') {
+        collage.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        collage.style.gridAutoRows = '1fr';
+        return;
+      }
+
+      if (layout === 'three-columns') {
+        collage.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        collage.style.gridAutoRows = '1fr';
+        return;
+      }
+
+      if (layout === 'masonry') {
+        collage.style.gridTemplateColumns = 'repeat(4, 1fr)';
+        collage.style.gridAutoRows = '1fr';
+        return;
+      }
+
+      if (layout === 'banner') {
+        collage.style.gridTemplateColumns = '1fr';
+        collage.style.gridAutoRows = '1fr';
+        return;
+      }
+
+      const columns = Math.ceil(Math.sqrt(count));
+      collage.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+      collage.style.gridAutoRows = '1fr';
+    }
+
+    async function downloadCollage() {
+      if (images.length === 0) {
+        alert('Please add at least one image first.');
+        return;
+      }
+
+      const canvas = await drawCollageToCanvas();
+      const link = document.createElement('a');
+      link.download = 'picture-collage.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function loadImage(src) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = src;
+      });
+    }
+
+    async function drawCollageToCanvas() {
+      const rect = collage.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      const height = Math.round(rect.height);
+      const gap = Number(gapInput.value);
+      const radius = Number(radiusInput.value);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.fillStyle = backgroundInput.value;
+      ctx.fillRect(0, 0, width, height);
+
+      const cells = [...collage.querySelectorAll('.cell')];
+      const loadedImages = await Promise.all(images.map(loadImage));
+
+      cells.forEach((cell, index) => {
+        const cellRect = cell.getBoundingClientRect();
+        const collageRect = collage.getBoundingClientRect();
+        const x = cellRect.left - collageRect.left;
+        const y = cellRect.top - collageRect.top;
+        const w = cellRect.width;
+        const h = cellRect.height;
+        const img = loadedImages[index];
+
+        ctx.save();
+        roundedRect(ctx, x, y, w, h, radius);
+        ctx.clip();
+        drawImageCover(ctx, img, x, y, w, h);
+        ctx.restore();
+      });
+
+      return canvas;
+    }
+
+    function drawImageCover(ctx, img, x, y, w, h) {
+      const imageRatio = img.width / img.height;
+      const boxRatio = w / h;
+      let drawWidth, drawHeight, drawX, drawY;
+
+      if (imageRatio > boxRatio) {
+        drawHeight = h;
+        drawWidth = h * imageRatio;
+        drawX = x - (drawWidth - w) / 2;
+        drawY = y;
+      } else {
+        drawWidth = w;
+        drawHeight = w / imageRatio;
+        drawX = x;
+        drawY = y - (drawHeight - h) / 2;
+      }
+
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    function roundedRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    renderCollage();
+  </script>
+</body>
+</html>
