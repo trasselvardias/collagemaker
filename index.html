@@ -104,6 +104,49 @@
       background: white;
     }
 
+    input[type="number"],
+    input[type="color"],
+    select,
+    button {
+      width: 100%;
+    }
+
+    input[type="number"],
+    input[type="color"] {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      background: white;
+    }
+
+    input[type="color"] {
+      height: 44px;
+      padding: 4px;
+    }
+
+    .inline-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .control small {
+      display: block;
+      margin-top: 6px;
+      color: #666;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .custom-size-controls {
+      display: none;
+    }
+
+    .custom-size-controls.visible {
+      display: block;
+    }
+
     button {
       cursor: pointer;
       border: none;
@@ -240,7 +283,17 @@
           <option value="800x800">Square</option>
           <option value="600x900">Portrait 2:3</option>
           <option value="1200x675">Widescreen 16:9</option>
+          <option value="custom">Custom Ratio / Size</option>
         </select>
+      </div>
+
+      <div class="control custom-size-controls" id="customSizeControls">
+        <label>Custom Canvas</label>
+        <div class="inline-grid">
+          <input type="number" id="customWidth" min="100" max="5000" value="1080" aria-label="Custom width in pixels" />
+          <input type="number" id="customHeight" min="100" max="5000" value="1080" aria-label="Custom height in pixels" />
+        </div>
+        <small>Enter width × height in pixels. This also sets the image ratio.</small>
       </div>
 
       <div class="control">
@@ -262,13 +315,9 @@
       </div>
 
       <div class="control">
-        <label for="exportScale">Export Resolution</label>
-        <select id="exportScale">
-          <option value="1">Normal 1×</option>
-          <option value="2">High 2×</option>
-          <option value="3">Ultra 3×</option>
-          <option value="4">Print 4×</option>
-        </select>
+        <label for="exportScale">Export Resolution Scale <span id="exportScaleValue">1×</span></label>
+        <input type="number" id="exportScale" min="0.25" max="10" step="0.25" value="1" />
+        <small>Example: 2 exports at double resolution, 4 exports at print-size resolution.</small>
       </div>
 
       <div class="control">
@@ -303,6 +352,10 @@
     const backgroundInput = document.getElementById('background');
     const gapValue = document.getElementById('gapValue');
     const radiusValue = document.getElementById('radiusValue');
+    const exportScaleValue = document.getElementById('exportScaleValue');
+    const customSizeControls = document.getElementById('customSizeControls');
+    const customWidthInput = document.getElementById('customWidth');
+    const customHeightInput = document.getElementById('customHeight');
     const downloadBtn = document.getElementById('downloadBtn');
     const clearBtn = document.getElementById('clearBtn');
 
@@ -330,7 +383,7 @@
       fileInput.value = '';
     });
 
-    [layoutSelect, sizeSelect, gapInput, radiusInput, fitModeSelect, exportScaleSelect, backgroundInput].forEach(control => {
+    [layoutSelect, sizeSelect, customWidthInput, customHeightInput, gapInput, radiusInput, fitModeSelect, exportScaleSelect, backgroundInput].forEach(control => {
       control.addEventListener('input', renderCollage);
     });
 
@@ -355,12 +408,14 @@
     }
 
     function renderCollage() {
-      const [width, height] = sizeSelect.value.split('x').map(Number);
+      const [width, height] = getCanvasSize();
       const gap = Number(gapInput.value);
       const radius = Number(radiusInput.value);
 
       gapValue.textContent = `${gap}px`;
       radiusValue.textContent = `${radius}px`;
+      exportScaleValue.textContent = `${sanitizeExportScale()}×`;
+      customSizeControls.classList.toggle('visible', sizeSelect.value === 'custom');
 
       collage.style.width = `${width}px`;
       collage.style.height = `${height}px`;
@@ -442,6 +497,26 @@
       collage.style.gridAutoRows = '1fr';
     }
 
+    function getCanvasSize() {
+      if (sizeSelect.value === 'custom') {
+        const width = clamp(Number(customWidthInput.value) || 1080, 100, 5000);
+        const height = clamp(Number(customHeightInput.value) || 1080, 100, 5000);
+        return [width, height];
+      }
+
+      return sizeSelect.value.split('x').map(Number);
+    }
+
+    function sanitizeExportScale() {
+      const scale = clamp(Number(exportScaleSelect.value) || 1, 0.25, 10);
+      exportScaleSelect.value = scale;
+      return scale;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
     async function downloadCollage() {
       if (images.length === 0) {
         alert('Please add at least one image first.');
@@ -465,7 +540,7 @@
 
     async function drawCollageToCanvas() {
       const rect = collage.getBoundingClientRect();
-      const scale = Number(exportScaleSelect.value);
+      const scale = sanitizeExportScale();
       const width = Math.round(rect.width);
       const height = Math.round(rect.height);
       const outputWidth = width * scale;
